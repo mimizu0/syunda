@@ -21,6 +21,11 @@ function pagesBase(): string {
   return raw.endsWith("/") ? raw : `${raw}/`;
 }
 
+function pagesRouterBasepath(): string {
+  const base = pagesBase().replace(/\/$/, "");
+  return !base || base === "." ? "/" : base;
+}
+
 /** The files `src/lib/db.ts` globs — same directory, same non-recursive scope. */
 function hasGlobbedMigrations(root: string): boolean {
   try {
@@ -181,11 +186,7 @@ export default defineConfig(({ command, isPreview }) => ({
         ? {
             spa: { enabled: true },
             pages: [{ path: "/", prerender: { enabled: true } }],
-            // Prerender must match "/" — Nitro prerenders "/" while the
-            // client runtime derives "/syunda" from BASE_URL in src/router.tsx.
-            // Setting basepath to "/syunda" here makes prerender request "/"
-            // miss (empty 0-byte `index`) and breaks Pages deploy.
-            router: { basepath: "/" },
+            router: { basepath: pagesRouterBasepath() },
           }
         : {},
     ),
@@ -197,7 +198,18 @@ export default defineConfig(({ command, isPreview }) => ({
             // manifest + head-tag middleware). Nitro v3 defaults serverDir to
             // false, so removing this silently unwires /?install=1 on deploys.
             // GitHub Pages is static and cannot run that middleware.
-            ...(isPages ? {} : { serverDir: "./server" }),
+            ...(isPages
+              ? {
+                  // Project Pages live under a subpath (e.g. /syunda/).
+                  // Start's router basepath and the client runtime must agree
+                  // on it, so Nitro has to prerender the basepath URL itself:
+                  // prerendering "/" only captures the basepath redirect (an
+                  // empty 0-byte `index`) and the hydrated app shows NotFound.
+                  // The HTML lands at `.output/public/<base>/index.html` and
+                  // scripts/build-pages.mjs moves it up to the artifact root.
+                  prerender: { routes: [pagesBase()], crawlLinks: false },
+                }
+              : { serverDir: "./server" }),
           }),
         ]
       : []),

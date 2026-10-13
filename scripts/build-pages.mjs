@@ -13,6 +13,8 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  rmSync,
+  statSync,
   writeFileSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
@@ -37,8 +39,50 @@ function rewriteBase(html, base) {
     .replaceAll('href="/__grok', `href="${base}__grok`);
 }
 
+function baseSegment() {
+  const base = pagesBase();
+  const seg = base.replace(/^\/+|\/+$/g, "");
+  return !seg || seg === "." ? "" : seg;
+}
+
+function nestedIndexPath() {
+  const seg = baseSegment();
+  return seg ? join(PUBLIC_DIR, seg, "index.html") : null;
+}
+
+function indexReady() {
+  if (existsSync(join(PUBLIC_DIR, "index.html"))) return true;
+  const nested = nestedIndexPath();
+  return !!nested && existsSync(nested);
+}
+
 function finish() {
+  const seg = baseSegment();
+  const nested = nestedIndexPath();
   const indexPath = join(PUBLIC_DIR, "index.html");
+  // Subpath deploys (e.g. /syunda/): Nitro prerenders the basepath URL and
+  // the HTML lands at `.output/public/<base>/index.html`. Move it up.
+  if (nested && !existsSync(indexPath) && existsSync(nested)) {
+    copyFileSync(nested, indexPath);
+    console.log(`[build:pages] moved ${seg}/index.html → index.html`);
+  }
+  // Drop the prerender redirect artifact (`/` → basepath 302, no extension)
+  // and the now-relocated nested directory.
+  try {
+    const stray = join(PUBLIC_DIR, "index");
+    if (existsSync(stray) && statSync(stray).isFile() && statSync(stray).size === 0) {
+      rmSync(stray);
+    }
+  } catch {
+    /* ignore */
+  }
+  if (seg) {
+    try {
+      rmSync(join(PUBLIC_DIR, seg), { recursive: true, force: true });
+    } catch {
+      /* ignore */
+    }
+  }
   if (!existsSync(indexPath)) {
     console.error("[build:pages] missing .output/public/index.html");
     process.exit(1);
@@ -81,7 +125,7 @@ const child = spawn("node", ["scripts/with-app-env.mjs", "vite", "build"], {
 });
 
 child.on("close", (code) => {
-  if (!existsSync(join(PUBLIC_DIR, "index.html"))) {
+  if (!indexReady()) {
     process.exit(code || 1);
   }
   if (code !== 0) {
