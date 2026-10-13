@@ -16,24 +16,26 @@ export type Records = {
   best: Partial<Record<ModeId, ModeBest>>;
 };
 
-const empty: Records = { version: VERSION, best: {} };
+function freshEmpty(): Records {
+  return { version: VERSION, best: {} };
+}
 
 function canUseStorage(): boolean {
   return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
 }
 
 export function loadRecords(): Records {
-  if (!canUseStorage()) return empty;
+  if (!canUseStorage()) return freshEmpty();
   try {
     const raw = window.localStorage.getItem(KEY);
-    if (!raw) return empty;
+    if (!raw) return freshEmpty();
     const parsed = JSON.parse(raw) as Records;
     if (!parsed || parsed.version !== VERSION || typeof parsed.best !== "object") {
-      return empty;
+      return freshEmpty();
     }
     return { version: VERSION, best: parsed.best ?? {} };
   } catch {
-    return empty;
+    return freshEmpty();
   }
 }
 

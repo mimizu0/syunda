@@ -17,7 +17,7 @@ export const Route = createRootRoute({
       },
       { title: APP_NAME },
       { name: "theme-color", content: "#0c0d0f" },
-      { name: "description", content: "ローマ字直打ちのタイピング。単語・中文・長文。" },
+      { name: "description", content: "ローマ字直打ちのタイピング。単語・短文・長文。" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
     ],
     links: [

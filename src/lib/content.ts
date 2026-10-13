@@ -17,7 +17,7 @@ export const MODE_META: Record<
     seconds: 60,
   },
   mid: {
-    label: "中文",
+    label: "短文",
     kicker: "60秒",
     blurb: "一文くらいの長さ",
     seconds: 60,

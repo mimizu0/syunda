@@ -81,7 +81,7 @@ export function PlayView({ mode, onQuit, onFinish }: Props) {
       keys: s.keys,
       at: Date.now(),
     };
-    const { improved } = saveBest(mode, run);
+    const { improved } = s.keys > 0 ? saveBest(mode, run) : { improved: false };
     onFinish({
       mode,
       kps,
