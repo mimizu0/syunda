@@ -191,7 +191,7 @@ export function normalizeReading(input: string): string {
 }
 
 export function isRomajiChar(ch: string): boolean {
-  return /^[a-zA-Z'\-]$/.test(ch);
+  return /^[a-zA-Z'-]$/.test(ch);
 }
 
 function lastVowel(spelling: string): string {
@@ -289,6 +289,8 @@ type Search = {
   kanaUsed: number;
   typedUsed: number;
   prevVowel: string;
+  /** Display remainder after the typed input (no duplicated prefix). */
+  rest: string;
 };
 
 function better(a: Search, b: Search): Search {
@@ -303,13 +305,21 @@ function better(a: Search, b: Search): Search {
 
 function search(kana: string, typed: string, prevVowel: string): Search {
   if (typed === "") {
-    return { kind: kana === "" ? "ok" : "prefix", kanaUsed: 0, typedUsed: 0, prevVowel };
+    return {
+      kind: kana === "" ? "ok" : "prefix",
+      kanaUsed: 0,
+      typedUsed: 0,
+      prevVowel,
+      rest: preferredRest(kana, prevVowel, ""),
+    };
   }
-  if (kana === "") return { kind: "fail", kanaUsed: 0, typedUsed: 0, prevVowel };
+  if (kana === "") return { kind: "fail", kanaUsed: 0, typedUsed: 0, prevVowel, rest: "" };
 
-  let best: Search = { kind: "fail", kanaUsed: 0, typedUsed: 0, prevVowel };
+  let best: Search = { kind: "fail", kanaUsed: 0, typedUsed: 0, prevVowel, rest: "" };
   const units = possibleUnits(kana, prevVowel);
   for (const u of units) {
+    // Consuming match: longest spelling first (greedy), so "nn" wins over
+    // "n" and acceptance stays lenient.
     const byLen = [...u.spellings].sort((x, y) => y.length - x.length);
     for (const sp of byLen) {
       if (typed.startsWith(sp)) {
@@ -320,13 +330,22 @@ function search(kana: string, typed: string, prevVowel: string): Search {
           kanaUsed: u.unit.length + sub.kanaUsed,
           typedUsed: sp.length + sub.typedUsed,
           prevVowel: sub.prevVowel,
+          rest: sub.rest,
         });
-      } else if (sp.startsWith(typed)) {
+      }
+    }
+    // Prefix hint: table order (most standard spelling first), so the shown
+    // remainder follows common romaji — "sha" not "silya", "shu" not "silyu".
+    for (const sp of u.spellings) {
+      if (!typed.startsWith(sp) && sp.startsWith(typed)) {
         best = better(best, {
           kind: "prefix",
           kanaUsed: 0,
           typedUsed: typed.length,
           prevVowel,
+          rest:
+            sp.slice(typed.length) +
+            preferredRest(kana.slice(u.unit.length), lastVowel(sp) || prevVowel, ""),
         });
       }
     }
@@ -368,8 +387,7 @@ export function analyze(reading: string, typed: string): AnalyzeResult {
     };
   }
   const remainingKana = kana.slice(found.kanaUsed);
-  const leftover = input.slice(found.typedUsed);
-  const restHint = preferredRest(remainingKana, found.prevVowel, leftover);
+  const restHint = found.rest;
   return {
     status: found.kind === "ok" ? "ok" : "prefix",
     kanaUsed: found.kanaUsed,
