@@ -21,11 +21,6 @@ function pagesBase(): string {
   return raw.endsWith("/") ? raw : `${raw}/`;
 }
 
-function pagesRouterBasepath(): string {
-  const base = pagesBase().replace(/\/$/, "");
-  return !base || base === "." ? "/" : base;
-}
-
 /** The files `src/lib/db.ts` globs — same directory, same non-recursive scope. */
 function hasGlobbedMigrations(root: string): boolean {
   try {
@@ -186,7 +181,11 @@ export default defineConfig(({ command, isPreview }) => ({
         ? {
             spa: { enabled: true },
             pages: [{ path: "/", prerender: { enabled: true } }],
-            router: { basepath: pagesRouterBasepath() },
+            // Prerender must match "/" — Nitro prerenders "/" while the
+            // client runtime derives "/syunda" from BASE_URL in src/router.tsx.
+            // Setting basepath to "/syunda" here makes prerender request "/"
+            // miss (empty 0-byte `index`) and breaks Pages deploy.
+            router: { basepath: "/" },
           }
         : {},
     ),
