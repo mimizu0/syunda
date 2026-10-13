@@ -1,0 +1,12 @@
+node_modules/
+.output/
+.vercel/
+.nitro/
+screenshots/
+artifacts/
+.grok/
+*.log
+dist/
+.DS_Store
+.project_id
+.node_modules.lock
